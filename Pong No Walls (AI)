@@ -1,0 +1,493 @@
+"""***********************************
+To do list:
+    edit score positions
+    Choose a difficulty (optional)
+    background music (optional)
+***********************************"""
+
+import pygame
+import sys
+import random
+from pygame.locals import *
+
+
+# Initialize pygame
+pygame.init()
+main_clock = pygame.time.Clock()
+
+
+# Game Window
+window_width = 1600
+window_height = 900
+window_surface = pygame.display.set_mode((window_width, window_height), 0, 32)
+pygame.display.set_caption('Time to Ping some Pongs')
+
+
+# Field variables
+midfield_x = window_width / 2
+midfield_y = window_height / 2
+
+
+# Colors
+white = (255, 255, 255)
+black = (0, 0, 0)
+
+
+# Paddle Size and Positions
+# Paddle Variables
+paddle_side_long = 300
+paddle_tb_long = 400
+paddle_short = 20
+paddle_side_half = paddle_side_long / 2
+paddle_tb_half = paddle_tb_long / 2
+
+# Paddle start positions
+paddle_side_start_y = midfield_y - paddle_side_half
+paddle_left_start_x = 0
+paddle_right_start_x = window_width - paddle_short
+paddle_player_start_x = (midfield_x * 3 / 2) - paddle_tb_half
+paddle_ai_start_x = (midfield_x / 2) - paddle_tb_half
+paddle_top_start_y = 0
+paddle_bottom_start_y = window_height - paddle_short
+
+# Player Right Paddle
+player_right = pygame.Rect(paddle_right_start_x, paddle_side_start_y, paddle_short, paddle_side_long)
+player_right_sprite = pygame.image.load('side_paddle.png')
+
+# Player Top and Bottom Paddles
+player_top = pygame.Rect(paddle_player_start_x, paddle_top_start_y, paddle_tb_long, paddle_short)
+player_bottom = pygame.Rect(paddle_player_start_x, paddle_bottom_start_y, paddle_tb_long, paddle_short)
+player_tb_sprite = pygame.image.load('top_bottom_paddle.png')
+
+# AI Left Paddle
+ai_left = pygame.Rect(paddle_left_start_x, paddle_side_start_y, paddle_short, paddle_side_long)
+ai_left_sprite = pygame.image.load('side_paddle.png')
+
+# AI Top and Bottom Paddles
+ai_top = pygame.Rect(paddle_ai_start_x, paddle_top_start_y, paddle_tb_long, paddle_short)
+ai_bottom = pygame.Rect(paddle_ai_start_x, paddle_bottom_start_y, paddle_tb_long, paddle_short)
+ai_tb_sprite = pygame.image.load('top_bottom_paddle.png')
+
+# Ball Position and Mechanics
+ball_size = 50
+ball_half = ball_size / 2
+ball = pygame.Rect(midfield_x - ball_half, midfield_y - ball_half, ball_size, ball_size)
+ball_sprite = pygame.image.load('ball.png')
+
+# Keyboard
+move_left = False
+move_right = False
+move_up = False
+move_down = False
+
+# Speeds - USE FACTORS OF RESOLUTION
+ball_speed_range = [-10, -5, -4, -2, 2, 4, 5, 10]
+player_move_speed = 5
+ai_move_speed = 0
+ai_easy = 2
+ai_hard = 5
+ai_omae_wa_mo_shindeiru = 10
+ball_x_speed = random.choice(ball_speed_range)
+ball_y_speed = random.choice(ball_speed_range)
+
+
+# Music - Sounds/Jingles found on freesound.org
+collision_sound = pygame.mixer.Sound('ding.wav')
+win_sound = pygame.mixer.Sound('win_sound.wav')
+lose_sound = pygame.mixer.Sound('lose_sound.wav')
+win_tune = pygame.mixer.Sound('win_tune.wav')
+lose_tune = pygame.mixer.Sound('lose_tune.wav')
+
+# Font
+comic_sans = pygame.font.SysFont('Comic Sans MS', 30)
+
+# New game variable
+new_game = True
+
+# Reset Variable
+breath_of_the_reset = False
+
+# Score board variables
+player_score = 0
+ai_score = 0
+player_games = 0
+ai_games = 0
+d_score_to_win = 2
+player_score_to_win = d_score_to_win
+ai_score_to_win = d_score_to_win
+games_to_win = 1
+
+# Win Screen Variables
+player_wins = "You Win! Play again? (Y/N)"
+ai_wins = "Ai Wins! Play again? (Y/N)"
+play_again = False
+
+# Variable fixing for a bug when ball clips paddle
+variable_buffer = 100
+x_time_now = 0
+x_time_check = 0
+y_time_now = 0
+y_time_check = 0
+
+# Game Loop
+while True:
+    # Check for Quit event
+    for event in pygame.event.get():
+        if event.type == QUIT:
+            pygame.quit()
+            sys.exit()
+        if event.type == KEYDOWN:
+            if event.key == K_LEFT or event.key == K_a:
+                move_right = False
+                move_left = True
+            if event.key == K_RIGHT or event.key == K_d:
+                move_left = False
+                move_right = True
+            if event.key == K_UP or event.key == K_w:
+                move_down = False
+                move_up = True
+            if event.key == K_DOWN or event.key == K_s:
+                move_up = False
+                move_down = True
+
+        if event.type == KEYUP:
+            if event.key == K_ESCAPE:
+                pygame.quit()
+                sys.exit()
+            if event.key == K_LEFT or event.key == K_a:
+                move_left = False
+            if event.key == K_RIGHT or event.key == K_d:
+                move_right = False
+            if event.key == K_UP or event.key == K_w:
+                move_up = False
+            if event.key == K_DOWN or event.key == K_s:
+                move_down = False
+            if event.key == K_ESCAPE:
+                pygame.quit()
+                sys.exit()
+
+    # Keep play__again false
+    play_again = False
+
+    # New Game
+    while new_game:
+        window_surface.fill(black)
+        diff_selector = comic_sans.render("Choose your Difficulty:", 1, white)
+        diff_easy = comic_sans.render("[1] Easy", 1, white)
+        diff_hard = comic_sans.render("[2] Hard", 1, white)
+        diff_very_hard = comic_sans.render("[3] Very hard", 1, white)
+        window_surface.blit(diff_selector, (600, 325))
+        window_surface.blit(diff_easy, (650, 375))
+        window_surface.blit(diff_hard, (650, 425))
+        window_surface.blit(diff_very_hard, (650, 475))
+
+        # Handler
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == KEYDOWN:
+                if event.key == K_1:
+                    ai_move_speed = ai_easy
+                    new_game = False
+                if event.key == K_2:
+                    ai_move_speed = ai_hard
+                    new_game = False
+                if event.key == K_3:
+                    ai_move_speed = ai_omae_wa_mo_shindeiru
+                    new_game = False
+            if event.type == KEYUP:
+                if event.key == K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+
+        pygame.display.update()
+
+    # Draw things
+    # Draw Background
+    window_surface.fill(black)
+
+    # Draw Net
+    for x in range(18):
+        if x % 2 != 1:
+            pygame.draw.line(window_surface, white, (midfield_x, (x * 50) + 25), (midfield_x, (x * 50) + 75), 4)
+
+    # Draw player
+    window_surface.blit(player_right_sprite, player_right)
+    window_surface.blit(player_tb_sprite, player_top)
+    window_surface.blit(player_tb_sprite, player_bottom)
+
+    # Draw AI
+    window_surface.blit(ai_left_sprite, ai_left)
+    window_surface.blit(ai_tb_sprite, ai_top)
+    window_surface.blit(ai_tb_sprite, ai_bottom)
+
+    # Draw Ball
+    window_surface.blit(ball_sprite, ball)
+
+    # Scores
+    # Change score to win to change for second condition to win (score + 2)
+    if (ai_score > d_score_to_win - 2) or (player_score > d_score_to_win - 2) and (abs(ai_score - player_score) < 2):
+        if player_score < ai_score:
+            player_score_to_win = ai_score + 2
+        elif player_score > ai_score:
+            ai_score_to_win = player_score + 2
+        else:
+            player_score_to_win = max(player_score_to_win, ai_score_to_win)
+            ai_score_to_win = player_score_to_win
+    else:
+        player_score_to_win = d_score_to_win
+        ai_score_to_win = d_score_to_win
+
+    # Player Score
+    player_game_board = comic_sans.render(("Player Matches Won: " + str(player_games) + "/" + str(games_to_win)), 1, white)
+    player_score_board = comic_sans.render(("Player Score: " + str(player_score) + "/" + str(player_score_to_win)), 1, white)
+    window_surface.blit(player_game_board, (window_width - 400, 50))
+    window_surface.blit(player_score_board, (window_width - 400, 100))
+
+    # Ai Score
+    ai_game_board = comic_sans.render(("Ai Matches Won: " + str(ai_games) + "/" + str(games_to_win)), 1, white)
+    ai_score_board = comic_sans.render(("Ai score: " + str(ai_score) + "/" + str(ai_score_to_win)), 1, white)
+    window_surface.blit(ai_game_board, (50, 50))
+    window_surface.blit(ai_score_board, (50, 100))
+
+    # Breathing room for a reset
+    if breath_of_the_reset:
+        pygame.time.delay(500)
+        pygame.display.update()
+        pygame.time.delay(500)
+        breath_of_the_reset = False
+
+    # Move Player
+    # Right Paddle
+    if move_down and player_right.bottom < window_height:
+        player_right.top += player_move_speed
+    if move_up and player_right.top > 0:
+        player_right.top -= player_move_speed
+
+    # Top and Bottom Paddles
+    if move_right and player_top.right < (window_width - paddle_short):
+        player_top.left += player_move_speed
+        player_bottom.left += player_move_speed
+    if move_left and player_top.left > midfield_x:
+        player_top.left -= player_move_speed
+        player_bottom.left -= player_move_speed
+
+    # Ball Mechanics
+    # Move the Ball
+    ball.centerx += ball_x_speed
+    ball.centery += ball_y_speed
+
+    # Reset the ball with random speeds if it goes out of boundaries, also reset paddle positions, also increment score
+    if (ball.left < 0) or (ball.right > window_width) or (ball.top < 0) or (ball.bottom > window_height):
+        # Increment Score, player gets "middle" advantage
+        if ball.centerx < midfield_x:
+            win_sound.play()
+            player_score += 1
+            if player_score >= player_score_to_win:
+                player_games += 1
+                player_score = 0
+                ai_score = 0
+                if player_games >= games_to_win:
+                    # Winscreen + reset
+                    win_tune.play()
+                    while not play_again:
+                        # Update score
+                        pygame.draw.rect(window_surface, black, (window_width - 400, 50, 350, 150))
+                        player_score = player_score_to_win
+                        player_games = games_to_win
+                        player_game_board = comic_sans.render(("Player Matches Won: " + str(player_games) + "/" + str(games_to_win)), 1, white)
+                        player_score_board = comic_sans.render(("Player Score: " + str(player_score) + "/" + str(player_score_to_win)), 1, white)
+                        window_surface.blit(player_game_board, (window_width - 400, 50))
+                        window_surface.blit(player_score_board, (window_width - 400, 100))
+
+                        # End Screen
+                        win_screen = comic_sans.render(player_wins, 1, white)
+                        window_surface.blit(win_screen, (midfield_x + 100, midfield_y))
+                        for event in pygame.event.get():
+                            if event.type == QUIT:
+                                pygame.quit()
+                                sys.exit()
+                            if event.type == KEYDOWN:
+                                if event.key == K_y:
+                                    # Score Reset
+                                    player_score = 0
+                                    ai_score = 0
+                                    player_games = 0
+                                    ai_games = 0
+
+                                    # Ball reset
+                                    ball.centerx = midfield_x
+                                    ball.centery = midfield_y
+                                    ball_x_speed = random.choice(ball_speed_range)
+                                    ball_y_speed = random.choice(ball_speed_range)
+
+                                    # Paddle Reset
+                                    player_right.topleft = (paddle_right_start_x, paddle_side_start_y)
+                                    player_top.topleft = (paddle_player_start_x, paddle_top_start_y)
+                                    player_bottom.topleft = (paddle_player_start_x, paddle_bottom_start_y)
+                                    ai_left.topleft = (paddle_left_start_x, paddle_side_start_y)
+                                    ai_top.topleft = (paddle_ai_start_x, paddle_top_start_y)
+                                    ai_bottom.topleft = (paddle_ai_start_x, paddle_bottom_start_y)
+
+                                    # set variables
+                                    new_game = True
+                                    play_again = True
+                                if event.key == K_n:
+                                    pygame.quit()
+                                    sys.exit()
+
+                            if event.type == KEYUP:
+                                if event.key == K_ESCAPE:
+                                    pygame.quit()
+                                    sys.exit()
+                        # Draw window
+                        pygame.display.update()
+        else:
+            lose_sound.play()
+            ai_score += 1
+            if ai_score >= ai_score_to_win:
+                ai_games += 1
+                ai_score = 0
+                player_score = 0
+                if ai_games >= games_to_win:
+                    # Winscreen and Reset
+                    lose_tune.play()
+                    while not play_again:
+                        # Update score
+                        pygame.draw.rect(window_surface, black, (50, 50, 350, 150))
+                        ai_score = ai_score_to_win
+                        ai_games = games_to_win
+                        ai_game_board = comic_sans.render(("Ai Matches Won: " + str(ai_games) + "/" + str(games_to_win)), 1, white)
+                        ai_score_board = comic_sans.render(("Ai score: " + str(ai_score) + "/" + str(ai_score_to_win)), 1, white)
+                        window_surface.blit(ai_game_board, (50, 50))
+                        window_surface.blit(ai_score_board, (50, 100))
+
+                        # End Screen
+                        win_screen = comic_sans.render(ai_wins, 1, white)
+                        window_surface.blit(win_screen, (midfield_x + 100, midfield_y))
+                        for event in pygame.event.get():
+                            if event.type == QUIT:
+                                pygame.quit()
+                                sys.exit()
+                            if event.type == KEYDOWN:
+                                if event.key == K_y:
+                                    # Score Reset
+                                    player_score = 0
+                                    ai_score = 0
+                                    player_games = 0
+                                    ai_games = 0
+
+                                    # Ball reset
+                                    ball.centerx = midfield_x
+                                    ball.centery = midfield_y
+                                    ball_x_speed = random.choice(ball_speed_range)
+                                    ball_y_speed = random.choice(ball_speed_range)
+
+                                    # Paddle Reset
+                                    player_right.topleft = (paddle_right_start_x, paddle_side_start_y)
+                                    player_top.topleft = (paddle_player_start_x, paddle_top_start_y)
+                                    player_bottom.topleft = (paddle_player_start_x, paddle_bottom_start_y)
+                                    ai_left.topleft = (paddle_left_start_x, paddle_side_start_y)
+                                    ai_top.topleft = (paddle_ai_start_x, paddle_top_start_y)
+                                    ai_bottom.topleft = (paddle_ai_start_x, paddle_bottom_start_y)
+
+                                    # Update Variables
+                                    new_game = True
+                                    play_again = True
+                                if event.key == K_n:
+                                    pygame.quit()
+                                    sys.exit()
+                            if event.type == KEYUP:
+                                if event.key == K_ESCAPE:
+                                    pygame.quit()
+                                    sys.exit()
+                        # Draw window
+                        pygame.display.update()
+
+        # Ball reset
+        ball.centerx = midfield_x
+        ball.centery = midfield_y
+        ball_x_speed = random.choice(ball_speed_range)
+        ball_y_speed = random.choice(ball_speed_range)
+
+        # Paddle Reset
+        player_right.topleft = (paddle_right_start_x, paddle_side_start_y)
+        player_top.topleft = (paddle_player_start_x, paddle_top_start_y)
+        player_bottom.topleft = (paddle_player_start_x, paddle_bottom_start_y)
+        ai_left.topleft = (paddle_left_start_x, paddle_side_start_y)
+        ai_top.topleft = (paddle_ai_start_x, paddle_top_start_y)
+        ai_bottom.topleft = (paddle_ai_start_x, paddle_bottom_start_y)
+
+        # Breathing room
+        breath_of_the_reset = True
+
+    # Player Ball Mechanics
+    if ball.colliderect(player_right):
+        x_time_now = pygame.time.get_ticks()
+        if (x_time_now - x_time_check) > variable_buffer:
+            collision_sound.play()
+            x_time_check = pygame.time.get_ticks()
+            ball_x_speed = (-ball_x_speed)
+            # add friction
+            if move_up:
+                ball_y_speed -= (player_move_speed / 2)
+            elif move_down:
+                ball_y_speed += (player_move_speed / 2)
+
+    if ball.colliderect(player_bottom) or ball.colliderect(player_top):
+        y_time_now = pygame.time.get_ticks()
+        if (y_time_now - y_time_check) > variable_buffer:
+            collision_sound.play()
+            y_time_check = pygame.time.get_ticks()
+            ball_y_speed = (-ball_y_speed)
+            # add friction
+            if move_left:
+                ball_x_speed -= (player_move_speed / 2)
+            elif move_right:
+                ball_x_speed += (player_move_speed / 2)
+
+    # Ai Ball Mechanics
+    if ball.colliderect(ai_left):
+        x_time_now = pygame.time.get_ticks()
+        if (x_time_now - x_time_check) > variable_buffer:
+            collision_sound.play()
+            x_time_check = pygame.time.get_ticks()
+            ball_x_speed = (-ball_x_speed)
+
+    if ball.colliderect(ai_bottom) or ball.colliderect(ai_top):
+        y_time_now = pygame.time.get_ticks()
+        if (y_time_now - y_time_check) > variable_buffer:
+            collision_sound.play()
+            y_time_check = pygame.time.get_ticks()
+            ball_y_speed = (-ball_y_speed)
+
+    # Ai Mechanics
+    # Side Panel Logic
+    if (ai_left.top >= ball.top) and (ai_left.top >= 0):
+        ai_left.top -= ai_move_speed
+    if (ai_left.bottom <= ball.bottom) and (ai_left.bottom <= window_height):
+        ai_left.top += ai_move_speed
+
+    # Top and Bottom Logic
+    if (ai_top.left >= ball.left) and (ai_top.left >= 0):
+        ai_top.left -= ai_move_speed
+        ai_bottom.left -= ai_move_speed
+    if (ai_top.right <= ball.right) and (ai_top.right <= midfield_x):
+        ai_top.left += ai_move_speed
+        ai_bottom.left += ai_move_speed
+
+    '''
+    # Test Variables
+    myfont = pygame.font.SysFont("monospace", 16)
+    top_right_value = myfont.render(str(player_top.right), 1, white)
+    side_top_value = myfont.render(str(player_top.left), 1, white)
+    side_bottom_value = myfont.render(str(player_right.right), 1, white)
+    window_surface.blit(top_right_value, (5, 10))
+    window_surface.blit(side_top_value, (5, 30))
+    window_surface.blit(side_bottom_value, (5, 50))
+    '''
+
+    # Draw window
+    pygame.display.update()
+    main_clock.tick(240)
